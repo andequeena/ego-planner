@@ -1,0 +1,32 @@
+<launch>
+  <!-- 启动 mockamap_node 节点，生成二维迷宫点云地图 -->
+  <node pkg="mockamap" type="mockamap_node" name="mockamap_node" output="screen">
+    <!-- 随机种子，保证每次生成的迷宫一致 -->
+    <param name="seed" type="int" value="510"/>
+    <!-- 点云发布频率，单位Hz -->
+    <param name="update_freq" type="double" value="1.0"/>
+
+    <!-- 地图分辨率，每个栅格0.1米 -->
+    <param name="resolution" type="double" value="0.1"/>
+
+    <!-- 地图尺寸，x/y方向20米，z方向2米 -->
+    <param name="x_length" type="int" value="20"/>
+    <param name="y_length" type="int" value="20"/>
+    <param name="z_length" type="int" value="1"/>
+
+    <!-- 地图类型，3表示二维迷宫 -->
+    <param name="type" type="int" value="3"/>
+    <!-- 迷宫通道宽度0.5米 -->
+    <param name="road_width" type="double" value="0.5"/>
+    <!-- 是否在x/y方向加墙，0为不加 -->
+    <param name="add_wall_x" type="int" value="0"/>
+    <param name="add_wall_y" type="int" value="0"/>
+    <!-- 迷宫生成算法类型，1为递归分割法 -->
+    <param name="maze_type" type="int" value="1"/>
+  </node>
+
+  <!-- 启动 rviz 并加载简化3D配置文件，自动可视化点云地图 -->
+  <node name="rviz" pkg="rviz" type="rviz"
+        args="-d $(find mockamap)/config/rviz_simple_3d.rviz"
+        />
+</launch>

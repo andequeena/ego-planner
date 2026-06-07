@@ -1,0 +1,26 @@
+# 这是一个简化版的rviz配置文件，只包含常用显示项，避免加载无效插件。
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz/Grid
+      Name: Grid
+    - Class: rviz/PointCloud2
+      Name: PointCloud2
+      Topic: /mock_map
+      Enabled: true
+    - Class: rviz/TF
+      Name: TF
+      Enabled: true
+  Global Options:
+    Fixed Frame: world
+  Tools:
+    - Class: rviz/Interact
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/Measure
+    - Class: rviz/SetInitialPose
+    - Class: rviz/SetGoal
+Views:
+  Current:
+    Class: rviz/Orbit
+    Target Frame: world
