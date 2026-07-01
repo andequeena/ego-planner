@@ -207,10 +207,12 @@ namespace ego_planner
 
     // yxc
     cout << "yxc yxc yxc yxc yxc yxc" << endl;
-    Eigen::Vector4d color = Eigen::Vector4d(1.0, 0.4, 0.7, 1.0); // pink color
+    // 使用亮黄色显示 A* 路径，在 RViz 深色背景、栅格地图和蓝色初始路径上更醒目。
+    Eigen::Vector4d color = Eigen::Vector4d(1.0, 0.85, 0.0, 1.0);
     // Eigen::Vector4d color = Eigen::Vector4d(0.0, 0.0, 0.0, 1.0); // pink color
     // Eigen::Vector4d color = Eigen::Vector4d(0.5 + ((double)rand() / RAND_MAX / 2), 0.5 + ((double)rand() / RAND_MAX / 2), 0, 1); // make the A star pathes different every time.
-    double scale = 0.05 + (double)rand() / RAND_MAX / 10;
+    // 固定并放大 marker 尺寸，避免原来的随机 0.05~0.15 在 RViz 中忽大忽小、偶尔太细看不清。
+    double scale = 0.22;
 
     // for ( int i=0; i<10; i++ )
     // {

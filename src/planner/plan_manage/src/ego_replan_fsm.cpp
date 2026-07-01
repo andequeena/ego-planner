@@ -36,8 +36,8 @@ namespace ego_planner
         // ROS 定时器的默认行为是单线程串行回调：
         // 当前一次回调还没执行完，下一次触发时间即使到了，也会被延迟到当前执行完后再执行。
         // 它不会打断当前回调，也不会“叠加”多个线程来抢跑。
-        exec_timer_ = nh.createTimer(ros::Duration(0.01), &EGOReplanFSM::execFSMCallback, this);
-        safety_timer_ = nh.createTimer(ros::Duration(0.05), &EGOReplanFSM::checkCollisionCallback, this);
+        exec_timer_ = nh.createTimer(ros::Duration(0.01), &EGOReplanFSM::execFSMCallback, this); // 100hz
+        safety_timer_ = nh.createTimer(ros::Duration(0.05), &EGOReplanFSM::checkCollisionCallback, this); // 20hz
 
         odom_sub_ = nh.subscribe("/odom_world", 1, &EGOReplanFSM::odometryCallback, this);
 
@@ -83,26 +83,35 @@ namespace ego_planner
         {
 
             /*** display ***/
+            // 以 0.1s 为间隔采样全局轨迹，用于可视化显示
             constexpr double step_size_t = 0.1;
+            // 计算采样点数量
             int i_end = floor(planner_manager_->global_data_.global_duration_ / step_size_t);
+            // 存储采样得到的全局路径点
             std::vector<Eigen::Vector3d> gloabl_traj(i_end);
             for (int i = 0; i < i_end; i++)
             {
+                // 取出每个采样时刻对应的轨迹点
                 gloabl_traj[i] = planner_manager_->global_data_.global_traj_.evaluate(i * step_size_t);
             }
 
+            // 终点速度置零，表示当前目标已就绪
             end_vel_.setZero();
+            // 标记已经接收到目标，并且有新的目标需要处理
             have_target_ = true;
             have_new_target_ = true;
 
             /*** FSM ***/
             // if (exec_state_ == WAIT_TARGET)
+            // 触发状态机切换至生成新轨迹状态
             changeFSMExecState(GEN_NEW_TRAJ, "TRIG");
             // else if (exec_state_ == EXEC_TRAJ)
             //   changeFSMExecState(REPLAN_TRAJ, "TRIG");
 
             // visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(1, 0, 0, 1), 0.3, 0);
+            // 给 RViz 留出一小段时间，避免显示过快
             ros::Duration(0.001).sleep();
+            // 将采样后的全局路径点发布给可视化模块显示
             visualization_->displayGlobalPathList(gloabl_traj, 0.1, 0);
             ros::Duration(0.001).sleep();
         }
@@ -112,7 +121,7 @@ namespace ego_planner
         }
     }
 
-    // 手动设置的航标点调用这个
+    // 通过ros发布的航标点调用这个
     void EGOReplanFSM::waypointCallback(const nav_msgs::PathConstPtr &msg)
     {
         if (msg->poses[0].pose.position.z < -0.1)
@@ -131,7 +140,6 @@ namespace ego_planner
 
         if (success)
         {
-
             /*** display ***/
             constexpr double step_size_t = 0.1;
             int i_end = floor(planner_manager_->global_data_.global_duration_ / step_size_t);
@@ -262,7 +270,6 @@ namespace ego_planner
             // start_yaw_(1) = start_yaw_(2) = 0.0;
 
             bool flag_random_poly_init;
-            // 如果不是连续调用
             if (timesOfConsecutiveStateCalls().first == 1)
                 flag_random_poly_init = false;
             else
@@ -519,15 +526,28 @@ namespace ego_planner
 
     void EGOReplanFSM::getLocalTarget()
     {
+        // t 用来沿着全局轨迹的时间轴向前采样，寻找当前局部规划的目标点。
         double t;
 
+        // 采样时间间隔：把规划视野 planning_horizen_ 按空间距离粗分成 20 份，
+        // 再除以最大速度，换算成沿全局轨迹查询位置时使用的时间步长。
         double t_step = planning_horizen_ / 20 / planner_manager_->pp_.max_vel_;
+
+        // dist_min 记录采样过程中全局轨迹点到当前起点 start_pt_ 的最小距离；
+        // dist_min_t 记录该最近点对应的全局轨迹时间，用于更新 last_progress_time_。
         double dist_min = 9999, dist_min_t = 0.0;
+
+        // 从上一次全局轨迹推进到的位置 last_progress_time_ 开始向前搜索，
+        // 直到全局轨迹结束 global_duration_。
         for (t = planner_manager_->global_data_.last_progress_time_; t < planner_manager_->global_data_.global_duration_; t += t_step)
         {
+            // 查询全局轨迹在时间 t 对应的位置，并计算它到当前局部规划起点的欧氏距离。
             Eigen::Vector3d pos_t = planner_manager_->global_data_.getPosition(t);
             double dist = (pos_t - start_pt_).norm();
 
+            // 第一个采样点理论上应该接近当前进度附近。
+            // 如果刚从 last_progress_time_ 开始采样就已经超过规划视野，
+            // 说明 last_progress_time_ 可能落后太多或全局轨迹进度记录异常。
             if (t < planner_manager_->global_data_.last_progress_time_ + 1e-5 && dist > planning_horizen_)
             {
                 // todo
@@ -538,23 +558,38 @@ namespace ego_planner
                 ROS_ERROR("last_progress_time_ ERROR !!!!!!!!!");
                 return;
             }
+
+            // 持续记录离当前起点最近的全局轨迹采样点。
+            // 后面找到局部目标点后，会把 last_progress_time_ 更新到这个最近点时间，
+            // 表示全局轨迹进度已经推进到离当前无人机位置最近的位置。
             if (dist < dist_min)
             {
                 dist_min = dist;
                 dist_min_t = t;
             }
+
+            // 当某个全局轨迹点距离当前起点达到或超过规划视野时，
+            // 将它作为本次局部重规划的局部目标点。
             if (dist >= planning_horizen_)
             {
                 local_target_pt_ = pos_t;
+
+                // 更新全局轨迹推进时间，避免下次仍从更早的位置重复搜索。
                 planner_manager_->global_data_.last_progress_time_ = dist_min_t;
                 break;
             }
         }
+
+        // 如果沿全局轨迹一直采样到末尾都没有找到超过规划视野的点，
+        // 说明终点已经在当前规划视野内，直接把最终目标点作为局部目标点。
         if (t > planner_manager_->global_data_.global_duration_) // Last global point
         {
             local_target_pt_ = end_pt_;
         }
 
+        // 判断局部目标点是否已经接近最终目标点。
+        // v^2 / (2a) 是从最大速度以最大加速度刹停所需的理论制动距离。
+        // 若剩余距离小于制动距离，则局部目标速度设为 0，促使轨迹在终点附近减速停止。
         if ((end_pt_ - local_target_pt_).norm() < (planner_manager_->pp_.max_vel_ * planner_manager_->pp_.max_vel_) / (2 * planner_manager_->pp_.max_acc_))
         {
             // local_target_vel_ = (end_pt_ - init_pt_).normalized() * planner_manager_->pp_.max_vel_ * (( end_pt_ - local_target_pt_ ).norm() / ((planner_manager_->pp_.max_vel_*planner_manager_->pp_.max_vel_)/(2*planner_manager_->pp_.max_acc_)));
@@ -563,6 +598,8 @@ namespace ego_planner
         }
         else
         {
+            // 若离终点还比较远，则沿用全局轨迹在时间 t 处的速度作为局部目标速度，
+            // 使局部轨迹尽量平滑地衔接全局轨迹方向和速度。
             local_target_vel_ = planner_manager_->global_data_.getVelocity(t);
             // cout << "AA" << endl;
         }

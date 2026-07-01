@@ -10,6 +10,8 @@
 namespace lbfgs
 {
     // ----------------------- Data Type Part -----------------------
+    // 这个头文件实现了一个 header-only 的 L-BFGS 求解器。
+    // 使用者只需要提供“目标函数 + 梯度”回调，求解器负责线搜索和有限记忆拟牛顿方向。
 
     /**
      *  Return values of lbfgs_optimize().
@@ -17,6 +19,7 @@ namespace lbfgs
      * Roughly speaking, a negative value indicates an error.
      */
 
+    // lbfgs_optimize() 的返回码：非负一般表示正常停止，负数表示参数、线搜索或数值错误。
     enum
     {
         /** L-BFGS reaches convergence. */
@@ -94,6 +97,7 @@ namespace lbfgs
          *  (corrections). The default value is 6. Values less than 3 are
          *  not recommended. Large values will result in excessive computing time.
          */
+        // 有限记忆窗口大小：保存最近 mem_size 组 (s, y) 校正对来近似逆 Hessian。
         int mem_size;
 
         /**
@@ -103,6 +107,7 @@ namespace lbfgs
          *      ||g|| < g_epsilon * max(1, ||x||),
          *  where ||.|| denotes the Euclidean (L2) norm. The default value is 1e-5.
          */
+        // 梯度收敛阈值，越小要求越精确，但迭代通常越多。
         double g_epsilon;
 
         /**
@@ -112,6 +117,7 @@ namespace lbfgs
          *  parameter is zero, the library does not perform the delta-based
          *  convergence test. The default value is 0.
          */
+        // 基于历史目标函数下降率的停止检测周期；为 0 时关闭该检测。
         int past;
 
         /**
@@ -124,6 +130,7 @@ namespace lbfgs
          *  the objective value of the current iteration.
          *  The default value is 1e-5.
          */
+        // 当 past 轮前后的相对下降率小于 delta 时，认为改进已经很小，可以停止。
         double delta;
 
         /**
@@ -134,6 +141,7 @@ namespace lbfgs
          *  optimization process until a convergence or error. The default value
          *  is 0.
          */
+        // 最大迭代次数；为 0 表示不按迭代次数主动停止。
         int max_iterations;
 
         /**
@@ -141,6 +149,7 @@ namespace lbfgs
          *  This parameter controls the number of function and gradients evaluations
          *  per iteration for the line search routine. The default value is 40.
          */
+        // 每次主迭代中线搜索最多调用目标函数/梯度的次数。
         int max_linesearch;
 
         /**
@@ -150,6 +159,7 @@ namespace lbfgs
          *  problem is extremely badly scaled (in which case the exponents should
          *  be increased).
          */
+        // 线搜索步长下界，防止步长缩得过小导致数值无意义。
         double min_step;
 
         /**
@@ -159,6 +169,7 @@ namespace lbfgs
          *  problem is extremely badly scaled (in which case the exponents should
          *  be increased).
          */
+        // 线搜索步长上界，可防止变量一次移动过远。
         double max_step;
 
         /**
@@ -166,6 +177,7 @@ namespace lbfgs
          *  The default value is 1e-4. This parameter should be greater
          *  than zero and smaller than 0.5.
          */
+        // Armijo 充分下降条件中的系数 c1。
         double f_dec_coeff;
 
         /**
@@ -178,6 +190,7 @@ namespace lbfgs
          *  greater than the f_dec_coeff parameter (1e-4) 
          *  and smaller than 1.0.
          */
+        // Wolfe 曲率条件中的系数 c2，必须大于 f_dec_coeff 且小于 1。
         double s_curv_coeff;
 
         /**
@@ -187,6 +200,7 @@ namespace lbfgs
          *  with the status code (::LBFGSERR_ROUNDING_ERROR) if the relative width
          *  of the interval of uncertainty is less than this parameter.
          */
+        // 线搜索不确定区间的相对宽度阈值，过小时认为受数值精度限制。
         double xtol;
     };
 
@@ -206,6 +220,7 @@ namespace lbfgs
      *  @retval double      The value of the objective function for the current
      *                          variables.
      */
+    // 目标函数回调：输入当前变量 x，输出梯度 g，并返回目标函数值 f(x)。
     typedef double (*lbfgs_evaluate_t)(void *instance,
                                        const double *x,
                                        double *g,
@@ -227,6 +242,7 @@ namespace lbfgs
      *  @retval double      The upperboud of the step in current line search routine,
      *                      such that stpbound*d is the maximum reasonable step.
      */
+    // 可选步长上界回调：用于根据当前点和搜索方向动态限制最大步长。
     typedef double (*lbfgs_stepbound_t)(void *instance,
                                         const double *xp,
                                         const double *d,
@@ -252,6 +268,7 @@ namespace lbfgs
      *  @retval int         Zero to continue the optimization process. Returning a
      *                      non-zero value will cancel the optimization process.
      */
+    // 可选进度回调：每次线搜索/迭代过程中报告当前状态；返回非零可中断优化。
     typedef int (*lbfgs_progress_t)(void *instance,
                                     const double *x,
                                     const double *g,
@@ -269,10 +286,15 @@ namespace lbfgs
 
     struct callback_data_t
     {
+        // 优化变量维度。
         int n;
+        // 用户上下文指针，会原样传回各类回调。
         void *instance;
+        // 目标函数和梯度回调。
         lbfgs_evaluate_t proc_evaluate;
+        // 动态步长上界回调，可为空。
         lbfgs_stepbound_t proc_stepbound;
+        // 进度/早停回调，可为空。
         lbfgs_progress_t proc_progress;
     };
 
@@ -281,9 +303,13 @@ namespace lbfgs
      */
     struct iteration_data_t
     {
+        // two-loop recursion 中保存的 alpha_i。
         double alpha;
+        // s_k = x_{k+1} - x_k，变量变化量。
         double *s; /* [n] */
+        // y_k = g_{k+1} - g_k，梯度变化量。
         double *y; /* [n] */
+        // y^T s，用于计算 rho = 1 / (y^T s)。
         double ys; /* vecdot(y, s) */
     };
 
@@ -392,6 +418,7 @@ namespace lbfgs
 
     inline void *vecalloc(size_t size)
     {
+        // 统一分配并清零工作内存，减少后续初始化遗漏带来的数值问题。
         void *memblock = malloc(size);
         if (memblock)
         {
@@ -402,16 +429,19 @@ namespace lbfgs
 
     inline void vecfree(void *memblock)
     {
+        // 与 vecalloc 配对释放；允许传入 NULL。
         free(memblock);
     }
 
     inline void veccpy(double *y, const double *x, const int n)
     {
+        // y = x。
         memcpy(y, x, sizeof(double) * n);
     }
 
     inline void vecncpy(double *y, const double *x, const int n)
     {
+        // y = -x，常用于把梯度转成最速下降方向。
         int i;
 
         for (i = 0; i < n; ++i)
@@ -422,6 +452,7 @@ namespace lbfgs
 
     inline void vecadd(double *y, const double *x, const double c, const int n)
     {
+        // y = y + c * x。
         int i;
 
         for (i = 0; i < n; ++i)
@@ -432,6 +463,7 @@ namespace lbfgs
 
     inline void vecdiff(double *z, const double *x, const double *y, const int n)
     {
+        // z = x - y。
         int i;
 
         for (i = 0; i < n; ++i)
@@ -442,6 +474,7 @@ namespace lbfgs
 
     inline void vecscale(double *y, const double c, const int n)
     {
+        // y = c * y。
         int i;
 
         for (i = 0; i < n; ++i)
@@ -452,6 +485,7 @@ namespace lbfgs
 
     inline void vecdot(double *s, const double *x, const double *y, const int n)
     {
+        // s = x^T y。
         int i;
         *s = 0.;
         for (i = 0; i < n; ++i)
@@ -462,12 +496,14 @@ namespace lbfgs
 
     inline void vec2norm(double *s, const double *x, const int n)
     {
+        // s = ||x||_2。
         vecdot(s, x, x, n);
         *s = (double)sqrt(*s);
     }
 
     inline void vec2norminv(double *s, const double *x, const int n)
     {
+        // s = 1 / ||x||_2，常用于初始化第一步线搜索步长。
         vec2norm(s, x, n);
         *s = (double)(1.0 / *s);
     }
@@ -516,6 +552,8 @@ namespace lbfgs
                                      const double tmax,
                                      int *brackt)
     {
+        // More-Thuente 线搜索的区间更新子程序。
+        // x 表示当前最好步长，y 表示不确定区间另一端，t 是本次试探步长。
         int bound;
         int dsign = *dt * (*dx / fabs(*dx)) < 0.;
         double mc;            /* minimizer of an interpolated cubic. */
@@ -526,6 +564,7 @@ namespace lbfgs
         /* Check the input parameters for errors. */
         if (*brackt)
         {
+            // 已经 bracket 到极小值时，t 必须落在当前不确定区间内。
             if (*t <= (*x <= *y ? *x : *y) || (*x >= *y ? *x : *y) <= *t)
             {
                 /* The trival value t is out of the interval. */
@@ -556,6 +595,7 @@ namespace lbfgs
             */
             *brackt = 1;
             bound = 1;
+            // 目标函数值变大，说明极小点已被夹在 x 和 t 之间。
             CUBIC_MINIMIZER_LBFGS(mc, *x, *fx, *dx, *t, *ft, *dt);
             QUARD_MINIMIZER_LBFGS(mq, *x, *fx, *dx, *t, *ft);
             if (fabs(mc - *x) < fabs(mq - *x))
@@ -577,6 +617,7 @@ namespace lbfgs
             */
             *brackt = 1;
             bound = 0;
+            // 函数下降但导数变号，说明跨过了极小点。
             CUBIC_MINIMIZER_LBFGS(mc, *x, *fx, *dx, *t, *ft, *dt);
             QUARD_MINIMIZER2_LBFGS(mq, *x, *dx, *t, *dt);
             if (fabs(mc - *t) > fabs(mq - *t))
@@ -602,6 +643,7 @@ namespace lbfgs
             farthest away is taken.
              */
             bound = 1;
+            // 函数下降且导数同号，但导数绝对值变小，继续沿该方向试探。
             CUBIC_MINIMIZER2_LBFGS(mc, *x, *fx, *dx, *t, *ft, *dt, tmin, tmax);
             QUARD_MINIMIZER2_LBFGS(mq, *x, *dx, *t, *dt);
             if (*brackt)
@@ -636,6 +678,7 @@ namespace lbfgs
             is either tmin or tmax, else the cubic minimizer is taken.
             */
             bound = 0;
+            // 导数没有变小，优先尝试边界或 bracket 内的三次插值点。
             if (*brackt)
             {
                 CUBIC_MINIMIZER_LBFGS(newt, *t, *ft, *dt, *y, *fy, *dy);
@@ -664,6 +707,7 @@ namespace lbfgs
         if (*fx < *ft)
         {
             /* Case a */
+            // t 比当前最好点差，因此把 t 作为不确定区间另一端。
             *y = *t;
             *fy = *ft;
             *dy = *dt;
@@ -673,11 +717,13 @@ namespace lbfgs
             /* Case c */
             if (dsign)
             {
+                // t 更优且导数变号，原 x 变成另一端点。
                 *y = *x;
                 *fy = *fx;
                 *dy = *dx;
             }
             /* Cases b and c */
+            // t 更优，更新当前最好点 x。
             *x = *t;
             *fx = *ft;
             *dx = *dt;
@@ -695,6 +741,7 @@ namespace lbfgs
         */
         if (*brackt && bound)
         {
+            // 若新步长过于靠近区间边界，则向区间内部收缩，提升线搜索稳定性。
             mq = *x + 0.66 * (*y - *x);
             if (*x < *y)
             {
@@ -726,6 +773,8 @@ namespace lbfgs
                                        callback_data_t *cd,
                                        const lbfgs_parameter_t *param)
     {
+        // More-Thuente 强 Wolfe 线搜索：沿搜索方向 s 寻找合适步长 stp。
+        // 成功时返回本次线搜索调用目标函数的次数，失败时返回 LBFGSERR_*。
         int count = 0;
         int brackt, stage1, uinfo = 0;
         double dg;
@@ -743,6 +792,7 @@ namespace lbfgs
         }
 
         /* Compute the initial gradient in the search direction. */
+        // dginit = g^T s，下降方向必须满足 dginit < 0。
         vecdot(&dginit, g, s, n);
 
         /* Make sure that s points to a descent direction. */
@@ -752,6 +802,7 @@ namespace lbfgs
         }
 
         /* Initialize local variables. */
+        // stage1 用于先满足“充分下降”的修改目标函数阶段，再转入强 Wolfe 条件。
         brackt = 0;
         stage1 = 1;
         finit = *f;
@@ -775,6 +826,7 @@ namespace lbfgs
         for (;;)
         {
             /* Report the progress. */
+            // 若用户提供 progress 回调，可在每次线搜索评估前检查是否需要提前取消。
             if (cd->proc_progress)
             {
                 double xnorm;
@@ -793,16 +845,19 @@ namespace lbfgs
             */
             if (brackt)
             {
+                // 已经夹住极小点时，线搜索范围就是 [stx, sty]。
                 stmin = stx <= sty ? stx : sty;
                 stmax = stx >= sty ? stx : sty;
             }
             else
             {
+                // 还没有夹住极小点时，允许向前扩展搜索区间。
                 stmin = stx;
                 stmax = *stp + 4.0 * (*stp - stx);
             }
 
             /* Clip the step in the range of [stpmin, stpmax]. */
+            // 把步长裁剪到用户/参数允许的范围。
             if (*stp < *stpmin)
                 *stp = *stpmin;
             if (*stpmax < *stp)
@@ -825,6 +880,7 @@ namespace lbfgs
             vecadd(x, s, *stp, n);
 
             /* Evaluate the function and gradient values. */
+            // 在试探点 x = xp + stp * s 上重新计算 f 和 g。
             *f = cd->proc_evaluate(cd->instance, x, g, cd->n);
             vecdot(&dg, g, s, n);
 
@@ -832,6 +888,7 @@ namespace lbfgs
             ++count;
 
             /* Test for errors and convergence. */
+            // 下面依次检查数值异常、步长边界、线搜索次数和强 Wolfe 条件是否满足。
             if (brackt && ((*stp <= stmin || stmax <= *stp) || uinfo != 0))
             {
                 /* Rounding errors prevent further progress. */
@@ -870,6 +927,7 @@ namespace lbfgs
             if (stage1 && *f <= ftest1 &&
                 (param->f_dec_coeff <= param->s_curv_coeff ? param->f_dec_coeff : param->s_curv_coeff) * dginit <= dg)
             {
+                // 已找到满足修改函数条件的点，后续切换到原函数的区间更新。
                 stage1 = 0;
             }
 
@@ -883,6 +941,7 @@ namespace lbfgs
             if (stage1 && ftest1 < *f && *f <= fx)
             {
                 /* Define the modified function and derivative values. */
+                // 第一阶段使用修改后的函数值，帮助找到满足充分下降的区间。
                 fm = *f - *stp * dgtest;
                 fxm = fx - stx * dgtest;
                 fym = fy - sty * dgtest;
@@ -912,6 +971,7 @@ namespace lbfgs
                 Call update_trial_interval() to update the interval of
                 uncertainty and to compute the new step.
                 */
+                // 使用原函数值更新不确定区间并得到下一次试探步长。
                 uinfo = update_trial_interval(
                     &stx, &fx, &dgx,
                     &sty, &fy, &dgy,
@@ -924,6 +984,7 @@ namespace lbfgs
             */
             if (brackt)
             {
+                // 若区间收缩不够快，则强制取中点附近，避免线搜索停滞。
                 if (0.66 * prev_width <= fabs(sty - stx))
                 {
                     *stp = stx + 0.5 * (sty - stx);
@@ -940,6 +1001,7 @@ namespace lbfgs
      * Default L-BFGS parameters.
      */
     static const lbfgs_parameter_t _default_param = {
+        // 默认参数偏稳健：8 组历史校正、强 Wolfe 线搜索、无最大迭代限制。
         8,
         1e-5,
         0,
@@ -963,6 +1025,7 @@ namespace lbfgs
      */
     inline void lbfgs_load_default_parameters(lbfgs_parameter_t *param)
     {
+        // 复制默认参数到用户结构体，用户通常先调用它再覆盖少数配置项。
         memcpy(param, &_default_param, sizeof(*param));
     }
 
@@ -1030,6 +1093,11 @@ namespace lbfgs
                               void *instance,
                               lbfgs_parameter_t *_param)
     {
+        // L-BFGS 主入口：
+        // 1. 检查参数并分配工作内存；
+        // 2. 计算初始目标函数/梯度；
+        // 3. 循环执行线搜索、收敛检查、有限记忆方向更新；
+        // 4. 返回最终状态码和目标函数值。
         int ret;
         int i, j, k, ls, end, bound;
         double step;
@@ -1037,6 +1105,7 @@ namespace lbfgs
         double step_min, step_max;
 
         /* Constant parameters and their default values. */
+        // 若用户未传参数，则使用内置默认值；m 是有限记忆历史长度。
         lbfgs_parameter_t param = (_param != NULL) ? (*_param) : _default_param;
         const int m = param.mem_size;
 
@@ -1050,6 +1119,7 @@ namespace lbfgs
         double rate = 0.;
 
         /* Construct a callback data. */
+        // 将回调函数和用户数据打包，便于线搜索内部统一调用。
         callback_data_t cd;
         cd.n = n;
         cd.instance = instance;
@@ -1058,6 +1128,7 @@ namespace lbfgs
         cd.proc_progress = proc_progress;
 
         /* Check the input parameters for errors. */
+        // 参数合法性检查尽量在分配内存前完成，失败时直接返回对应错误码。
         if (n <= 0)
         {
             return LBFGSERR_INVALID_N;
@@ -1104,12 +1175,14 @@ namespace lbfgs
         }
 
         /* Allocate working space. */
+        // xp/gp 保存上一轮变量和梯度，x/g 是当前变量和梯度，d 是搜索方向。
         xp = (double *)vecalloc(n * sizeof(double));
         g = (double *)vecalloc(n * sizeof(double));
         gp = (double *)vecalloc(n * sizeof(double));
         d = (double *)vecalloc(n * sizeof(double));
 
         /* Allocate limited memory storage. */
+        // lm 是循环缓冲区，保存最近 m 轮的 s/y 校正对。
         lm = (iteration_data_t *)vecalloc(m * sizeof(iteration_data_t));
 
         /* Initialize the limited memory. */
@@ -1123,12 +1196,14 @@ namespace lbfgs
         }
 
         /* Allocate an array for storing previous values of the objective function. */
+        // pf 保存 past 周期内的历史目标函数，用于相对下降率停止判据。
         if (0 < param.past)
         {
             pf = (double *)vecalloc(param.past * sizeof(double));
         }
 
         /* Evaluate the function value and its gradient. */
+        // 初始点的目标函数和梯度由用户回调计算。
         fx = cd.proc_evaluate(cd.instance, x, g, cd.n);
 
         /* Store the initial value of the objective function. */
@@ -1146,6 +1221,7 @@ namespace lbfgs
         /*
         Make sure that the initial variables are not a minimizer.
         */
+        // 若初始梯度已经足够小，直接返回 already minimized。
         vec2norm(&xnorm, x, n);
         vec2norm(&gnorm, g, n);
 
@@ -1169,10 +1245,12 @@ namespace lbfgs
             while (loop == 1)
             {
                 /* Store the current position and gradient vectors. */
+                // 保存线搜索前的 x_k 和 g_k，方便失败回滚和构造 s/y。
                 veccpy(xp, x, n);
                 veccpy(gp, g, n);
 
                 // If the step bound can be provied dynamically, then apply it.
+                // 若用户提供动态步长上界，则把本轮线搜索的最大步长限制在该上界内。
                 step_min = param.min_step;
                 step_max = param.max_step;
                 if (cd.proc_stepbound)
@@ -1184,11 +1262,13 @@ namespace lbfgs
                 }
 
                 /* Search for an optimal step. */
+                // 沿 d 做 More-Thuente 线搜索，更新 x、fx、g 和实际采用的 step。
                 ls = line_search_morethuente(n, x, &fx, g, d, &step, xp, gp, &step_min, &step_max, &cd, &param);
 
                 if (ls < 0)
                 {
                     /* Revert to the previous point. */
+                    // 线搜索失败时回滚到上一轮点，返回线搜索错误码。
                     veccpy(x, xp, n);
                     veccpy(g, gp, n);
                     ret = ls;
@@ -1197,6 +1277,7 @@ namespace lbfgs
                 }
 
                 /* Compute x and g norms. */
+                // 收敛判据需要当前变量范数和梯度范数。
                 vec2norm(&xnorm, x, n);
                 vec2norm(&gnorm, g, n);
 
@@ -1220,6 +1301,7 @@ namespace lbfgs
                 if (gnorm / xnorm <= param.g_epsilon)
                 {
                     /* Convergence. */
+                    // 梯度相对变量尺度足够小，认为优化收敛。
                     ret = LBFGS_CONVERGENCE;
                     break;
                 }
@@ -1235,11 +1317,13 @@ namespace lbfgs
                     if (param.past <= k)
                     {
                         /* Compute the relative improvement from the past. */
+                        // 与 past 轮前目标函数比较，判断最近一段时间内是否几乎没有改进。
                         rate = (pf[k % param.past] - fx) / fx;
 
                         /* The stopping criterion. */
                         if (fabs(rate) < param.delta)
                         {
+                            // 目标函数相对下降率过小，触发停止条件。
                             ret = LBFGS_STOP;
                             break;
                         }
@@ -1252,6 +1336,7 @@ namespace lbfgs
                 if (param.max_iterations != 0 && param.max_iterations < k + 1)
                 {
                     /* Maximum number of iterations. */
+                    // 达到最大迭代次数，返回对应状态码。
                     ret = LBFGSERR_MAXIMUMITERATION;
                     break;
                 }
@@ -1262,6 +1347,7 @@ namespace lbfgs
                 y_{k+1} = g_{k+1} - g_{k}.
                 */
                 it = &lm[end];
+                // 当前槽位保存本轮从 x_k 到 x_{k+1} 的变量差和梯度差。
                 vecdiff(it->s, x, xp, n);
                 vecdiff(it->y, g, gp, n);
 
@@ -1288,11 +1374,13 @@ namespace lbfgs
                 end = (end + 1) % m;
 
                 /* Compute the negative of gradients. */
+                // two-loop recursion 从 q = -g 开始，逐步乘以近似逆 Hessian。
                 vecncpy(d, g, n);
 
                 j = end;
                 for (i = 0; i < bound; ++i)
                 {
+                    // 第一重循环：从最新到最旧应用校正对，计算 alpha 并修正 q。
                     j = (j + m - 1) % m; /* if (--j == -1) j = m-1; */
                     it = &lm[j];
                     /* \alpha_{j} = \rho_{j} s^{t}_{j} \cdot q_{k+1}. */
@@ -1306,6 +1394,7 @@ namespace lbfgs
 
                 for (i = 0; i < bound; ++i)
                 {
+                    // 第二重循环：从旧到新恢复方向，得到近似 -H_k g_k。
                     it = &lm[j];
                     /* \beta_{j} = \rho_{j} y^t_{j} \cdot \gamm_{i}. */
                     vecdot(&beta, it->y, d, n);
@@ -1318,11 +1407,13 @@ namespace lbfgs
                 /*
                 Now the search direction d is ready. We try step = 1 first.
                 */
+                // 拟牛顿方向通常优先尝试完整步长 1，再由线搜索缩放。
                 step = 1.0;
             }
         }
 
         /* Return the final value of the objective function. */
+        // 将最终目标函数值写回给调用者。
         if (ptr_fx != NULL)
         {
             *ptr_fx = fx;
@@ -1331,6 +1422,7 @@ namespace lbfgs
         vecfree(pf);
 
         /* Free memory blocks used by this function. */
+        // 释放所有工作内存；x 本身由调用者管理，不在这里释放。
         if (lm != NULL)
         {
             for (i = 0; i < m; ++i)
@@ -1355,6 +1447,7 @@ namespace lbfgs
      */
     inline const char *lbfgs_strerror(int err)
     {
+        // 将返回码转成可读字符串，便于 ROS 日志或调试输出。
         switch (err)
         {
         case LBFGS_CONVERGENCE:
