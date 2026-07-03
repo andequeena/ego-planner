@@ -129,7 +129,7 @@ namespace ego_planner
                 {
                     flag_got_start = false;
                     flag_got_end = false;
-                    // 存的是满足条件的段 
+                    // 存的是满足条件的段
                     // 每个 pair 表示一段与障碍相交的控制点索引范围 [in_id, out_id]。
                     segment_ids.push_back(std::pair<int, int>(in_id, out_id));
                 }
@@ -210,6 +210,7 @@ namespace ego_planner
         constexpr double MINIMUM_PERCENT = 0.0; // Each segment is guaranteed to have sufficient points to generate sufficient thrust
         // minimum_points 按总控制点数给每个碰撞段设置最少控制点数量。
         // 当前 MINIMUM_PERCENT 为 0，实际不会强制扩展；保留这套逻辑便于需要更强避障推力时调整。
+        // 这里一次声明两个 int：minimum_points 会立刻计算，num_points 先声明，后面按当前段长度赋值。
         int minimum_points = round(init_points.cols() * MINIMUM_PERCENT), num_points;
         for (size_t i = 0; i < segment_ids.size(); i++)
         {
@@ -405,7 +406,10 @@ namespace ego_planner
 
     double BsplineOptimizer::costFunctionRebound(void *func_data, const double *x, double *grad, const int n)
     {
-        // L-BFGS 的 C 风格回调接口：把 func_data 转回优化器对象后计算 rebound 代价。
+        // 这是 L-BFGS 要求的 C 风格回调函数，不能直接写成普通成员函数调用 this。
+        // func_data 是一个“万能指针”（void*）：调用 lbfgs_optimize(...) 时把 this 传进来，
+        // 回调触发时再用 reinterpret_cast 转回 BsplineOptimizer*，这样才能访问当前优化器对象的成员变量和成员函数。
+        // x 指向当前待优化变量数组，grad 指向梯度数组，n 是变量个数；combineCostRebound 会填充 cost 和 grad。
         BsplineOptimizer *opt = reinterpret_cast<BsplineOptimizer *>(func_data);
 
         double cost;
@@ -417,7 +421,10 @@ namespace ego_planner
 
     double BsplineOptimizer::costFunctionRefine(void *func_data, const double *x, double *grad, const int n)
     {
-        // refine 阶段使用同样的回调形式，但代价项换成平滑、贴合参考线和动力学可行性。
+        // refine 阶段使用同样的回调形式：
+        // func_data 仍然是 lbfgs_optimize(...) 传进来的 this，只是先被保存成 void*。
+        // void* 本身不知道真实类型，不能直接调用成员函数，所以必须转回 BsplineOptimizer*。
+        // 这里的代价项换成 refine 用的平滑、贴合参考线和动力学可行性。
         BsplineOptimizer *opt = reinterpret_cast<BsplineOptimizer *>(func_data);
 
         double cost;
@@ -1012,6 +1019,7 @@ namespace ego_planner
         return false;
     }
 
+    // 其他文件调用BsplineOptimizeTrajRebound、BsplineOptimizeTrajRefine
     bool BsplineOptimizer::BsplineOptimizeTrajRebound(Eigen::MatrixXd &optimal_points, double ts)
     {
         // rebound 阶段：在已有 cps_ 和碰撞约束基础上优化控制点，使轨迹远离障碍。
@@ -1026,7 +1034,6 @@ namespace ego_planner
 
     bool BsplineOptimizer::BsplineOptimizeTrajRefine(const Eigen::MatrixXd &init_points, const double ts, Eigen::MatrixXd &optimal_points)
     {
-
         // refine 阶段：以 rebound 后的轨迹为初值，进一步平滑并贴合参考轨迹。
         setControlPoints(init_points);
         setBsplineInterval(ts);
