@@ -13,7 +13,7 @@
 
   <!-- There are two kinds of maps you can choose, just comment out the one you don’t need like the follow. Have a try. /-->
 
-  <![CDATA[node pkg ="map_generator" name ="random_forest" type ="random_forest" output = "screen">    
+  <!-- <node pkg ="map_generator" name ="random_forest" type ="random_forest" output = "screen">    
     <remap from="~odometry"   to="$(arg odometry_topic)"/>    
     <param name="init_state_x"   value="$(arg init_x)"/>
     <param name="init_state_y"   value="$(arg init_y)"/>
@@ -40,7 +40,7 @@
     <param name="sensing/rate"   value="10.0"/>  
     
     <param name="min_distance" value="$(arg min_dist)"/>         
-  </node]]>
+  </node> -->
 
   <node pkg="mockamap" type="mockamap_node" name="mockamap_node" output="screen">  
       <remap from="/mock_map" to="/map_generator/global_cloud"/>

@@ -124,6 +124,8 @@ void SO3Control::calculateControl(const Eigen::Vector3d &des_pos,
     // 用 b3c 和期望 yaw 方向 b1d 构造一个正交坐标系：
     // b2c = b3c x b1d，随后 b1c = b2c x b3c。
     // 最终 [b1c b2c b3c] 就是期望姿态旋转矩阵的三个列向量。
+    // b1d：原始期望机头方向
+    // b1c：在必须满足推力方向 b3c 的前提下，修正后的真实机头方向
     b2c.noalias() = b3c.cross(b1d).normalized();
     b1c.noalias() = b2c.cross(b3c).normalized();
 
