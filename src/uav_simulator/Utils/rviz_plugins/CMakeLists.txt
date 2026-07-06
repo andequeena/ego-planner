@@ -7,12 +7,13 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rviz
   multi_map_server
+  quadrotor_msgs
 )
 
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES irobot_msgs
-  CATKIN_DEPENDS multi_map_server
+  CATKIN_DEPENDS multi_map_server quadrotor_msgs
   DEPENDS system_lib
           message_runtime
 )
@@ -73,7 +74,7 @@ include_directories(
 
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
 
-add_dependencies(${PROJECT_NAME} multi_map_server_generate_messages_cpp)
+add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
 target_link_libraries(${PROJECT_NAME}
     ${catkin_LIBRARIES}

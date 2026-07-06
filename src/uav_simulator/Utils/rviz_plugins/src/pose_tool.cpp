@@ -1,3 +1,6 @@
+// 文件说明：pose_tool.cpp 属于rviz_plugins：提供在 RViz 中交互发布目标位姿的工具。
+// 注释原则：说明接口意图、数据单位、坐标系及关键算法步骤；保持原有行为不变。
+
 /*
  * Copyright (c) 2008, Willow Garage, Inc.
  * All rights reserved.
@@ -65,7 +68,7 @@ Pose3DTool::onInitialize()
 void
 Pose3DTool::activate()
 {
-  setStatus("Click and drag mouse to set position/orientation.");
+  setStatus("Left-drag: set yaw. Shift + left-drag vertically: set height.");
   state_ = Position;
 }
 
@@ -85,9 +88,6 @@ Pose3DTool::processMouseEvent(ViewportMouseEvent& event)
   static double        prevangle;
   const double         z_scale    = 50;
   const double         z_interval = 0.5;
-  Ogre::Quaternion     orient_x =
-    Ogre::Quaternion(Ogre::Radian(Ogre::Math::HALF_PI), Ogre::Vector3::UNIT_Z);
-
   if (event.leftDown())
   {
     ROS_ASSERT(state_ == Position);
@@ -114,8 +114,8 @@ Pose3DTool::processMouseEvent(ViewportMouseEvent& event)
       {
         double angle = atan2(cur_pos.y - pos_.y, cur_pos.x - pos_.x);
         arrow_->getSceneNode()->setVisible(true);
-        arrow_->setOrientation(Ogre::Quaternion(orient_x));
-        if (event.right())
+        arrow_->setDirection(Ogre::Vector3(cos(angle), sin(angle), 0.0));
+        if (event.shift())
           state_  = Height;
         initz     = pos_.z;
         prevz     = event.y;
@@ -144,9 +144,8 @@ Pose3DTool::processMouseEvent(ViewportMouseEvent& event)
         Ogre::Vector3 arr_pos = pos_;
         arr_pos.z = initz - ((initz - pos_.z > 0) ? 1 : -1) * k * z_interval;
         arrow__->setPosition(arr_pos);
-        arrow__->setOrientation(
-          Ogre::Quaternion(Ogre::Radian(prevangle), Ogre::Vector3::UNIT_Z) *
-          orient_x);
+        arrow__->setDirection(
+          Ogre::Vector3(cos(prevangle), sin(prevangle), 0.0));
         arrow_array.push_back(arrow__);
       }
       flags |= Render;

@@ -5,9 +5,10 @@ SET(CMAKE_BUILD_TYPE Release) # Release, RelWithDebInfo
 ADD_COMPILE_OPTIONS(-std=c++11 )
 ADD_COMPILE_OPTIONS(-std=c++14 )
 
-set(ENABLE_CUDA false)
-#set(ENABLE_CUDA true)
+#set(ENABLE_CUDA false)
+set(ENABLE_CUDA true)
 
+# 这里一定要依据自己的显卡的nvidia-smi中的信息来填写
 if(ENABLE_CUDA)
   find_package(CUDA REQUIRED)
   SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3 -use_fast_math)
@@ -20,7 +21,9 @@ if(ENABLE_CUDA)
 #       -gencode arch=compute_52,code=sm_52; 
 #       -gencode arch=compute_60,code=sm_60;
 #       -gencode arch=compute_61,code=sm_61;
-      -gencode arch=compute_75,code=sm_75;
+#       -gencode arch=compute_75,code=sm_75;
+      -gencode arch=compute_89,code=sm_89;
+      -gencode arch=compute_89,code=compute_89;
   ) 
 
   SET(CUDA_PROPAGATE_HOST_FLAGS OFF)

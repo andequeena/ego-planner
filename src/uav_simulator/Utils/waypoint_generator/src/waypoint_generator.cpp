@@ -15,19 +15,24 @@
 using namespace std;
 using bfmt = boost::format;
 
+// 轨迹点发布器：pub1 发布给规划器，pub2 发布给 RViz 可视化。
 ros::Publisher pub1;
 ros::Publisher pub2;
 ros::Publisher pub3;
+
+// waypoint_type 决定目标点来源：manual、circle、eight、points、series 等。
 string waypoint_type = string("manual");
 bool is_odom_ready;
 nav_msgs::Odometry odom;
 nav_msgs::Path waypoints;
 
 // series waypoint needed
+// series 模式下，每一段 Path 会按触发时间排序后缓存到队列里。
 std::deque<nav_msgs::Path> waypointSegments;
 ros::Time trigged_time;
 
 void load_seg(ros::NodeHandle& nh, int segid, const ros::Time& time_base) {
+    // 从私有参数 segX/ 下读取单段轨迹配置，例如 seg0/x、seg0/y、seg0/z。
     std::string seg_str = boost::str(bfmt("seg%d/") % segid);
     double yaw;
     double time_of_start = 0.0;
@@ -52,6 +57,7 @@ void load_seg(ros::NodeHandle& nh, int segid, const ros::Time& time_base) {
 
     path_msg.header.stamp = time_base + ros::Duration(time_of_start);
 
+    // series 中的点是相对当前里程计位姿的局部坐标，这里旋转并平移到 world 坐标。
     double baseyaw = tf::getYaw(odom.pose.pose.orientation);
     
     for (size_t k = 0; k < ptx.size(); ++k) {
@@ -71,6 +77,7 @@ void load_seg(ros::NodeHandle& nh, int segid, const ros::Time& time_base) {
 }
 
 void load_waypoints(ros::NodeHandle& nh, const ros::Time& time_base) {
+    // 读取 segment_cnt，并逐段加载；每段的开始时间必须严格递增。
     int seg_cnt = 0;
     waypointSegments.clear();
     ROS_ASSERT(nh.getParam("segment_cnt", seg_cnt));
@@ -84,6 +91,7 @@ void load_waypoints(ros::NodeHandle& nh, const ros::Time& time_base) {
 }
 
 void publish_waypoints() {
+    // 发布给规划模块的 Path 使用 world 坐标系，并在发布前临时补入当前初始位姿。
     waypoints.header.frame_id = std::string("world");
     waypoints.header.stamp = ros::Time::now();
     pub1.publish(waypoints);
@@ -96,6 +104,7 @@ void publish_waypoints() {
 }
 
 void publish_waypoints_vis() {
+    // 可视化消息使用 PoseArray，第一项放当前无人机位姿，后面依次放目标点。
     nav_msgs::Path wp_vis = waypoints;
     geometry_msgs::PoseArray poseArray;
     poseArray.header.frame_id = std::string("world");
@@ -116,6 +125,7 @@ void publish_waypoints_vis() {
 }
 
 void odom_callback(const nav_msgs::Odometry::ConstPtr& msg) {
+    // 持续更新当前里程计；series 模式会在里程计时间到达段起始时间时发布下一段。
     is_odom_ready = true;
     odom = *msg;
 
@@ -144,6 +154,7 @@ void odom_callback(const nav_msgs::Odometry::ConstPtr& msg) {
 }
 
 void goal_callback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
+    // RViz 目标点回调：根据 waypoint_type 生成预设轨迹，或累积/删除/提交手动目标点。
 /*    if (!is_odom_ready) {
         ROS_ERROR("[waypoint_generator] No odom!");
         return;
@@ -170,6 +181,7 @@ void goal_callback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
     } else if (waypoint_type == string("series")) {
         load_waypoints(n, trigged_time);
     } else if (waypoint_type == string("manual-lonely-waypoint")) {
+        // manual-lonely-waypoint 每次只保留一个目标点，适合单点导航测试。
         if (msg->pose.position.z > -0.1) {
             // if height > 0, it's a valid goal;
             geometry_msgs::PoseStamped pt = *msg;
@@ -181,10 +193,12 @@ void goal_callback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
             ROS_WARN("[waypoint_generator] invalid goal in manual-lonely-waypoint mode.");
         }
     } else {
+        // 普通 manual 模式通过 z 值区分三种操作：添加点、删除最后一点、结束输入并发布。
         if (msg->pose.position.z > 0) {
             // if height > 0, it's a normal goal;
             geometry_msgs::PoseStamped pt = *msg;
             if (waypoint_type == string("noyaw")) {
+                // noyaw 模式忽略 RViz 目标点朝向，改用当前无人机 yaw。
                 double yaw = tf::getYaw(odom.pose.pose.orientation);
                 pt.pose.orientation = tf::createQuaternionMsgFromYaw(yaw);
             }
@@ -207,6 +221,7 @@ void goal_callback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
 }
 
 void traj_start_trigger_callback(const geometry_msgs::PoseStamped& msg) {
+    // 外部触发回调：收到触发后，按当前 waypoint_type 立即生成并发布轨迹。
     if (!is_odom_ready) {
         ROS_ERROR("[waypoint_generator] No odom!");
         return;
@@ -242,6 +257,7 @@ void traj_start_trigger_callback(const geometry_msgs::PoseStamped& msg) {
 }
 
 int main(int argc, char** argv) {
+    // 节点入口：订阅 odom/goal/trigger，发布规划用 waypoints 和 RViz 可视化 waypoints_vis。
     ros::init(argc, argv, "waypoint_generator");
     ros::NodeHandle n("~");
     n.param("waypoint_type", waypoint_type, string("manual"));

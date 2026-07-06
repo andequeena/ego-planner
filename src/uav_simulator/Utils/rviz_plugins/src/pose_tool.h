@@ -1,3 +1,6 @@
+// 文件说明：pose_tool.h 属于rviz_plugins：提供在 RViz 中交互发布目标位姿的工具。
+// 注释原则：说明接口意图、数据单位、坐标系及关键算法步骤；保持原有行为不变。
+
 /*
  * Copyright (c) 2008, Willow Garage, Inc.
  * All rights reserved.

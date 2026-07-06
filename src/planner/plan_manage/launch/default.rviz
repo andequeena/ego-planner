@@ -1,3 +1,9 @@
+# RViz 配置文件说明：
+# - 这是 YAML 格式，`#` 开头的内容是注释，不会影响 RViz 读取。
+# - 如果之后在 RViz 里点击 Save Config，RViz 可能会重新生成文件并删除这些注释。
+# - 主要关注 `Visualization Manager -> Displays`，那里决定地图、轨迹、机器人等内容如何显示。
+
+# Panels：RViz 左右侧停靠面板的布局配置，只影响界面面板，不影响话题显示内容。
 Panels:
   - Class: rviz/Displays
     Help Height: 0
@@ -29,11 +35,21 @@ Panels:
     Name: Time
     SyncMode: 0
     SyncSource: simulation_map
+
+# Toolbars：RViz 顶部工具栏按钮的显示样式。
 Toolbars:
   toolButtonStyle: 2
+
+# Visualization Manager：RViz 的核心显示配置。
+# 包含所有 Display、全局坐标系、工具、视角等。
 Visualization Manager:
   Class: ""
+
+  # Displays：左侧 Displays 面板中的所有显示对象。
+  # 每个 `Class` 表示一种 RViz 显示插件，例如 Axes/Grid/Marker/PointCloud2/Path。
   Displays:
+
+    # Axes：在 Fixed Frame 原点显示 xyz 坐标轴，方便判断 world 坐标系方向。
     - Class: rviz/Axes
       Enabled: true
       Length: 1
@@ -41,6 +57,9 @@ Visualization Manager:
       Radius: 0.100000001
       Reference Frame: <Fixed Frame>
       Value: true
+
+    # Grid：XY 平面网格，只是空间参考线，不来自 ROS topic。
+    # Plane Cell Count 控制网格范围，Cell Size 控制每格大小。
     - Alpha: 0.5
       Cell Size: 1
       Class: rviz/Grid
@@ -59,8 +78,13 @@ Visualization Manager:
       Plane Cell Count: 40
       Reference Frame: <Fixed Frame>
       Value: true
+
+    # Planning：规划相关显示分组，主要显示目标点、全局路径、优化轨迹、A* 路径、无人机历史轨迹。
     - Class: rviz/Group
       Displays:
+
+        # goal_point：EGO planner 发布的目标点 Marker。
+        # 你当前选中的 /goal_point 就在这里，对应 topic `/ego_planner_node/goal_point`。
         - Class: rviz/Marker
           Enabled: true
           Marker Topic: /ego_planner_node/goal_point
@@ -69,6 +93,9 @@ Visualization Manager:
             "": true
           Queue Size: 100
           Value: true
+
+        # global_path：全局路径 Marker，当前 Enabled=false，所以默认不显示。
+        # 需要调试全局路径时可以在 RViz Displays 面板中勾选。
         - Class: rviz/Marker
           Enabled: false
           Marker Topic: /ego_planner_node/global_list
@@ -77,6 +104,9 @@ Visualization Manager:
             {}
           Queue Size: 100
           Value: false
+
+        # optimal_traj：优化后的局部轨迹/最终轨迹 Marker，默认显示。
+        # 通常用于观察 bspline 优化后的轨迹是否平滑、是否绕开障碍。
         - Class: rviz/Marker
           Enabled: true
           Marker Topic: /ego_planner_node/optimal_list
@@ -85,6 +115,9 @@ Visualization Manager:
             "": true
           Queue Size: 100
           Value: true
+
+        # AStar：A* 搜索得到的离散绕障路径，默认关闭。
+        # 调试避障搜索或 rebound 约束生成时可以打开。
         - Class: rviz/Marker
           Enabled: false
           Marker Topic: /ego_planner_node/a_star_list
@@ -93,6 +126,9 @@ Visualization Manager:
             {}
           Queue Size: 100
           Value: false
+
+        # InitTraj：优化前的初始轨迹，默认关闭。
+        # 与 optimal_traj 对比可以看出优化器对轨迹做了哪些调整。
         - Class: rviz/Marker
           Enabled: false
           Marker Topic: /ego_planner_node/init_list
@@ -101,6 +137,9 @@ Visualization Manager:
             {}
           Queue Size: 100
           Value: false
+
+        # drone_path：无人机里程计轨迹 Path，来自 `/odom_visualization/path`。
+        # 这是实际/仿真飞行历史路径，不是规划器当前输出的单条轨迹。
         - Alpha: 1
           Buffer Length: 1
           Class: rviz/Path
@@ -126,8 +165,13 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: Planning
+
+    # Mapping：地图相关显示分组，显示全局点云、膨胀占据栅格、原始占据栅格。
     - Class: rviz/Group
       Displays:
+
+        # simulation_map：地图生成器发布的全局点云，通常表示仿真环境障碍物。
+        # Alpha=0.2 表示半透明；Style=Boxes 表示用小方块显示点云。
         - Alpha: 0.200000003
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -158,6 +202,9 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
+
+        # map inflate：膨胀后的占据地图，规划器实际避障通常会参考这类膨胀障碍。
+        # Topic `/grid_map/occupancy_inflate` 显示的是考虑安全距离后的障碍区域。
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -188,6 +235,9 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
+
+        # real_map：原始占据地图，当前 Enabled=false。
+        # 和 map inflate 对比可以看出障碍膨胀后的安全裕度。
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -220,8 +270,12 @@ Visualization Manager:
           Value: false
       Enabled: true
       Name: Mapping
+
+    # Simulation：仿真机器人模型显示分组。
     - Class: rviz/Group
       Displays:
+
+        # robot：无人机/机器人模型 Marker，来自 `/odom_visualization/robot`。
         - Class: rviz/Marker
           Enabled: true
           Marker Topic: /odom_visualization/robot
@@ -232,6 +286,9 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: Simulation
+
+    # depth：深度图显示，当前关闭。
+    # 如果运行了 pcl_render_node 并发布 `/pcl_render_node/depth`，可以开启查看深度图。
     - Class: rviz/Image
       Enabled: false
       Image Topic: /pcl_render_node/depth
@@ -245,12 +302,18 @@ Visualization Manager:
       Unreliable: false
       Value: false
   Enabled: true
+
+  # Global Options：全局渲染和坐标系设置。
+  # Fixed Frame=world 表示所有 Display 都会被转换到 world 坐标系下显示。
   Global Options:
     Background Color: 255; 253; 224
     Default Light: true
     Fixed Frame: world
     Frame Rate: 30
   Name: root
+
+  # Tools：顶部工具栏中的交互工具。
+  # 注意这里的 SetGoal 默认发 `/move_base_simple/goal`，EGO planner 是否使用它取决于 launch/节点订阅配置。
   Tools:
     - Class: rviz/Interact
       Hide Inactive Objects: true
@@ -261,10 +324,15 @@ Visualization Manager:
       Topic: /initialpose
     - Class: rviz/SetGoal
       Topic: /move_base_simple/goal
+    - Class: rviz_plugins/Goal3DTool
+      Topic: /move_base_simple/goal
     - Class: rviz/PublishPoint
       Single click: true
       Topic: /clicked_point
   Value: true
+
+  # Views：当前相机视角和保存的视角。
+  # 只影响打开 RViz 后看到的观察角度，不影响规划/仿真。
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
@@ -308,6 +376,9 @@ Visualization Manager:
         Target Frame: <Fixed Frame>
         Value: ThirdPersonFollower (rviz)
         Yaw: 3.15040731
+
+# Window Geometry：RViz 窗口大小、停靠面板折叠状态和 Qt 内部窗口布局。
+# 这一大段通常不用手动改；它只影响界面布局，不影响显示 topic 或坐标系。
 Window Geometry:
   Displays:
     collapsed: true

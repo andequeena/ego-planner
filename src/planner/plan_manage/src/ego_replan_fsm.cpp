@@ -132,7 +132,9 @@ namespace ego_planner
         init_pt_ = odom_pos_;
 
         bool success = false;
-        end_pt_ << msg->poses[0].pose.position.x, msg->poses[0].pose.position.y, 1.0;
+        // end_pt_ << msg->poses[0].pose.position.x, msg->poses[0].pose.position.y, 1.0;
+        // 接收三维目标点
+        end_pt_ << msg->poses[0].pose.position.x, msg->poses[0].pose.position.y, msg->poses[0].pose.position.z;
         // 开始规划
         success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 

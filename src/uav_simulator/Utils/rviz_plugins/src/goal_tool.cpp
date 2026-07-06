@@ -1,3 +1,6 @@
+// 文件说明：goal_tool.cpp 属于rviz_plugins：提供在 RViz 中交互发布目标位姿的工具。
+// 注释原则：说明接口意图、数据单位、坐标系及关键算法步骤；保持原有行为不变。
+
 /*
  * Copyright (c) 2008, Willow Garage, Inc.
  * All rights reserved.
@@ -34,48 +37,61 @@
 #include "rviz/display_context.h"
 #include "rviz/properties/string_property.h"
 
+#include <quadrotor_msgs/GoalSet.h>
+
 #include "goal_tool.h"
 
 namespace rviz
 {
 
-Goal3DTool::Goal3DTool()
-{
-  shortcut_key_ = 'g';
+    Goal3DTool::Goal3DTool()
+    {
+        shortcut_key_ = 'g';
 
-  topic_property_ = new StringProperty( "Topic", "goal",
-                                        "The topic on which to publish navigation goals.",
-                                        getPropertyContainer(), SLOT( updateTopic() ), this );
-}
+        topic_property_ = new StringProperty("Topic", "goal",
+                                             "The topic on which to publish navigation goals.",
+                                             getPropertyContainer(), SLOT(updateTopic()), this);
+        // topic_property_droneID_ = new StringProperty("Topic", "goal_with_id",
+        //                                              "The topic on which to publish navigation goals.",
+        //                                              getPropertyContainer(), SLOT(updateTopic()), this);
+    }
 
-void Goal3DTool::onInitialize()
-{
-  Pose3DTool::onInitialize();
-  setName( "3D Nav Goal" );
-  updateTopic();
-}
+    void Goal3DTool::onInitialize()
+    {
+        Pose3DTool::onInitialize();
+        setName("3D Nav Goal");
+        updateTopic();
+    }
 
-void Goal3DTool::updateTopic()
-{
-  pub_ = nh_.advertise<geometry_msgs::PoseStamped>( topic_property_->getStdString(), 1 );
-}
+    void Goal3DTool::updateTopic()
+    {
+        pub_goal_ = nh_.advertise<geometry_msgs::PoseStamped>(topic_property_->getStdString(), 1);
+        pub_droneID_goal_ = nh_.advertise<quadrotor_msgs::GoalSet>("/goal_with_id", 1);
+    }
 
-void Goal3DTool::onPoseSet(double x, double y, double z, double theta)
-{
-  ROS_WARN("3D Goal Set");
-  std::string fixed_frame = context_->getFixedFrame().toStdString();
-  tf::Quaternion quat;
-  quat.setRPY(0.0, 0.0, theta);
-  tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(quat, tf::Point(x, y, z)), ros::Time::now(), fixed_frame);
-  geometry_msgs::PoseStamped goal;
-  tf::poseStampedTFToMsg(p, goal);
-  ROS_INFO("Setting goal: Frame:%s, Position(%.3f, %.3f, %.3f), Orientation(%.3f, %.3f, %.3f, %.3f) = Angle: %.3f\n", fixed_frame.c_str(),
-      goal.pose.position.x, goal.pose.position.y, goal.pose.position.z,
-      goal.pose.orientation.x, goal.pose.orientation.y, goal.pose.orientation.z, goal.pose.orientation.w, theta);
-  pub_.publish(goal);
-}
+    void Goal3DTool::onPoseSet(double x, double y, double z, double theta)
+    {
+        ROS_WARN("3D Goal Set");
+        std::string fixed_frame = context_->getFixedFrame().toStdString();
+        tf::Quaternion quat;
+        quat.setRPY(0.0, 0.0, theta);
+        tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(quat, tf::Point(x, y, z)), ros::Time::now(), fixed_frame);
+        geometry_msgs::PoseStamped goal;
+        tf::poseStampedTFToMsg(p, goal);
+        ROS_INFO("Setting goal: Frame:%s, Position(%.3f, %.3f, %.3f), Orientation(%.3f, %.3f, %.3f, %.3f) = Angle: %.3f\n", fixed_frame.c_str(),
+                 goal.pose.position.x, goal.pose.position.y, goal.pose.position.z,
+                 goal.pose.orientation.x, goal.pose.orientation.y, goal.pose.orientation.z, goal.pose.orientation.w, theta);
+        pub_goal_.publish(goal);
+
+        quadrotor_msgs::GoalSet goal_with_id;
+        goal_with_id.drone_id = 0;
+        goal_with_id.goal[0] = x;
+        goal_with_id.goal[1] = y;
+        goal_with_id.goal[2] = z;
+        pub_droneID_goal_.publish(goal_with_id);
+    }
 
 } // end namespace rviz
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS( rviz::Goal3DTool, rviz::Tool )
+PLUGINLIB_EXPORT_CLASS(rviz::Goal3DTool, rviz::Tool)

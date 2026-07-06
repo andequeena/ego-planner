@@ -1,3 +1,6 @@
+// 文件说明：goal_tool.h 属于rviz_plugins：提供在 RViz 中交互发布目标位姿的工具。
+// 注释原则：说明接口意图、数据单位、坐标系及关键算法步骤；保持原有行为不变。
+
 /*
  * Copyright (c) 2012, Willow Garage, Inc.
  * All rights reserved.
@@ -30,43 +33,41 @@
 #ifndef RVIZ_GOAL_TOOL_H
 #define RVIZ_GOAL_TOOL_H
 
-#ifndef Q_MOC_RUN  // See: https://bugreports.qt-project.org/browse/QTBUG-22829
-# include <QObject>
+#ifndef Q_MOC_RUN // See: https://bugreports.qt-project.org/browse/QTBUG-22829
+#include <QObject>
 
-# include <ros/ros.h>
+#include <ros/ros.h>
 
-# include "pose_tool.h"
+#include "pose_tool.h"
 #endif
 
 namespace rviz
 {
-class Arrow;
-class DisplayContext;
-class StringProperty;
+    class Arrow;
+    class DisplayContext;
+    class StringProperty;
 
-class Goal3DTool: public Pose3DTool
-{
-Q_OBJECT
-public:
-  Goal3DTool();
-  virtual ~Goal3DTool() {}
-  virtual void onInitialize();
+    class Goal3DTool : public Pose3DTool
+    {
+        Q_OBJECT
+    public:
+        Goal3DTool();
+        virtual ~Goal3DTool() {}
+        virtual void onInitialize();
 
-protected:
-  virtual void onPoseSet(double x, double y, double z, double theta);
+    protected:
+        virtual void onPoseSet(double x, double y, double z, double theta);
 
-private Q_SLOTS:
-  void updateTopic();
+    private Q_SLOTS:
+        void updateTopic();
 
-private:
-  ros::NodeHandle nh_;
-  ros::Publisher pub_;
+    private:
+        ros::NodeHandle nh_;
+        ros::Publisher pub_goal_, pub_droneID_goal_;
 
-  StringProperty* topic_property_;
-};
+        StringProperty *topic_property_;
+    };
 
 }
 
 #endif
-
-
