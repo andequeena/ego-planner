@@ -15,7 +15,6 @@ quadrotor_msgs::PositionCommand cmd;
 
 // 位置环和速度环增益，会写入 cmd.kx / cmd.kv。
 // 这里默认全为 0，表示 traj_server 只负责发布参考轨迹；
-// 实际控制增益通常由下游控制器或其他参数文件决定。
 double pos_gain[3] = {0, 0, 0};
 double vel_gain[3] = {0, 0, 0};
 
@@ -34,7 +33,7 @@ vector<UniformBspline> traj_;
 // 当前轨迹总时长，由位置 B 样条的 knot span 计算得到。
 double traj_duration_;
 
-// 当前轨迹的起始执行时间。t_cur = now - start_time_。
+// 当前轨迹的起始执行时间。
 ros::Time start_time_;
 
 // 当前轨迹编号，原样转发到 PositionCommand，方便下游区分不同轨迹。
@@ -120,8 +119,7 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, ros:
     double yawdot = 0;
 
     // 根据前视点计算期望机头朝向：
-    //   如果 t_cur + time_forward_ 没超过轨迹总时长，就看前方 time_forward_ 秒的位置；
-    //   否则看轨迹终点。
+    // 如果 t_cur + time_forward_ 没超过轨迹总时长，就看前方 time_forward_ 秒的位置。否则看轨迹终点。
     // dir 表示“当前位置 pos 指向前视点”的方向向量。
     Eigen::Vector3d dir = t_cur + time_forward_ <= traj_duration_ ? traj_[0].evaluateDeBoorT(t_cur + time_forward_) - pos : traj_[0].evaluateDeBoorT(traj_duration_) - pos;
 
@@ -211,8 +209,7 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, ros:
         }
     }
 
-    // 对 yaw 做一个非常简单的一阶低通滤波，减少指令抖动。
-    // 注：原注释里写作 nieve LPF，应是 naive LPF，保留原文不改。
+    // 对 yaw 做一个非常简单的一阶低通滤波，减少指令抖动。naive LPF
     if (fabs(yaw - last_yaw_) <= max_yaw_change)
         yaw = 0.5 * last_yaw_ + 0.5 * yaw; // nieve LPF
 
@@ -263,7 +260,6 @@ void cmdCallback(const ros::TimerEvent &e)
         /*** calculate yaw ***/
 
         // 计算 2 秒后的前视位置，但目前没有实际发布或使用。
-        // 这里可能是保留给调试、显示或后续控制策略的变量。
         double tf = min(traj_duration_, t_cur + 2.0);
         pos_f = traj_[0].evaluateDeBoorT(tf);
     }
@@ -365,7 +361,6 @@ int main(int argc, char **argv)
     // 否则 calculate_yaw 中的 t_cur + time_forward_ 会看向当前时间之前的位置。
     nh.param("traj_server/time_forward", time_forward_, -1.0);
 
-    // yaw 历史状态初始化。
     last_yaw_ = 0.0;
     last_yaw_dot_ = 0.0;
 

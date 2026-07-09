@@ -108,7 +108,7 @@ namespace ego_planner
             // else if (exec_state_ == EXEC_TRAJ)
             //   changeFSMExecState(REPLAN_TRAJ, "TRIG");
 
-            // visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(1, 0, 0, 1), 0.3, 0);
+            visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(1, 0, 0, 1), 0.3, 0);
             // 给 RViz 留出一小段时间，避免显示过快
             ros::Duration(0.001).sleep();
             // 将采样后的全局路径点发布给可视化模块显示
@@ -158,6 +158,7 @@ namespace ego_planner
             /*** FSM ***/
             if (exec_state_ == WAIT_TARGET)
                 changeFSMExecState(GEN_NEW_TRAJ, "TRIG");
+            // 如果正在执行轨迹收到新的目标点触发重规划
             else if (exec_state_ == EXEC_TRAJ)
                 changeFSMExecState(REPLAN_TRAJ, "TRIG");
 
@@ -218,7 +219,6 @@ namespace ego_planner
 
     void EGOReplanFSM::execFSMCallback(const ros::TimerEvent &e)
     {
-
         // static int fsm_num = 0;
         // fsm_num++;
         // if (fsm_num == 100)
@@ -260,9 +260,6 @@ namespace ego_planner
 
         case GEN_NEW_TRAJ:
         {
-            // 正常来讲这个状态只进入一次
-            cout << "hahaha1" << endl;
-
             start_pt_ = odom_pos_;
             start_vel_ = odom_vel_;
             start_acc_.setZero();
@@ -293,8 +290,6 @@ namespace ego_planner
 
         case REPLAN_TRAJ:
         {
-            cout << "hahaha2" << endl;
-
             if (planFromCurrentTraj())
             {
                 changeFSMExecState(EXEC_TRAJ, "FSM");
@@ -303,21 +298,27 @@ namespace ego_planner
             {
                 changeFSMExecState(REPLAN_TRAJ, "FSM");
             }
-
             break;
         }
 
         case EXEC_TRAJ:
         {
             /* determine if need to replan */
+            // 这里是在“正在执行当前局部轨迹”时，周期性判断是否需要重新规划。
+            // 先拿到当前局部轨迹的相关数据，包含轨迹起始时间、总持续时间以及当前轨迹的位姿函数。
             LocalTrajData *info = &planner_manager_->local_data_;
             ros::Time time_now = ros::Time::now();
+            // 计算当前已经执行了多久，也就是从轨迹开始以来经过了多少时间。
             double t_cur = (time_now - info->start_time_).toSec();
+            // 由于轨迹不可能无限执行，超出总时长时就把它限制到轨迹末端，避免越界。
             t_cur = min(info->duration_, t_cur);
 
+            // 根据当前时间在轨迹上查询当前应该处于的位置。
             Eigen::Vector3d pos = info->position_traj_.evaluateDeBoorT(t_cur);
 
             /* && (end_pt_ - pos).norm() < 0.5 */
+            // 如果当前时间已经接近或超过轨迹结束时间，说明本段轨迹已经执行完。
+            // 此时清空当前目标标志，切回等待目标状态，准备接收下一个目标。
             if (t_cur > info->duration_ - 1e-2)
             {
                 have_target_ = false;
@@ -325,16 +326,22 @@ namespace ego_planner
                 changeFSMExecState(WAIT_TARGET, "FSM");
                 return;
             }
+            // 如果无人机已经非常接近最终目标点，说明当前轨迹已经走到末端附近，
+            // 不需要再触发重规划，直接保持当前执行状态。
             else if ((end_pt_ - pos).norm() < no_replan_thresh_)
             {
                 // cout << "near end" << endl;
                 return;
             }
+            // 如果当前已经非常靠近轨迹起点，说明本次轨迹几乎没有向前推进，
+            // 这时也不再继续触发重规划，避免重复无意义的计算。
             else if ((info->start_pos_ - pos).norm() < replan_thresh_)
             {
                 // cout << "near start" << endl;
                 return;
             }
+            // 如果以上条件都不满足，说明当前轨迹还在正常飞行中，且没有靠近终点或起点，
+            // 那么就需要进入重规划状态，重新生成局部轨迹以适应当前场景。
             else
             {
                 changeFSMExecState(REPLAN_TRAJ, "FSM");
@@ -366,7 +373,6 @@ namespace ego_planner
 
     bool EGOReplanFSM::planFromCurrentTraj()
     {
-
         LocalTrajData *info = &planner_manager_->local_data_;
         ros::Time time_now = ros::Time::now();
         double t_cur = (time_now - info->start_time_).toSec();
@@ -396,6 +402,7 @@ namespace ego_planner
         return true;
     }
 
+    // 20hz运行
     void EGOReplanFSM::checkCollisionCallback(const ros::TimerEvent &e)
     {
         LocalTrajData *info = &planner_manager_->local_data_;
@@ -415,8 +422,6 @@ namespace ego_planner
 
             if (map->getInflateOccupancy(info->position_traj_.evaluateDeBoorT(t)))
             {
-                cout << "hahaha3" << endl;
-
                 if (planFromCurrentTraj()) // Make a chance
                 {
                     changeFSMExecState(EXEC_TRAJ, "SAFETY");
@@ -444,7 +449,6 @@ namespace ego_planner
     // 重要接口
     bool EGOReplanFSM::callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj)
     {
-
         getLocalTarget();
 
         bool plan_success =
@@ -455,7 +459,6 @@ namespace ego_planner
 
         if (plan_success)
         {
-
             auto info = &planner_manager_->local_data_;
 
             /* publish traj */

@@ -2,7 +2,6 @@
 # - 这是 YAML 格式，`#` 开头的内容是注释，不会影响 RViz 读取。
 # - 如果之后在 RViz 里点击 Save Config，RViz 可能会重新生成文件并删除这些注释。
 # - 主要关注 `Visualization Manager -> Displays`，那里决定地图、轨迹、机器人等内容如何显示。
-
 # Panels：RViz 左右侧停靠面板的布局配置，只影响界面面板，不影响话题显示内容。
 Panels:
   - Class: rviz/Displays
