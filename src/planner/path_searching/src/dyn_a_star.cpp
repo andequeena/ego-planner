@@ -13,7 +13,7 @@ AStar::~AStar()
 
 void AStar::initGridMap(GridMap::Ptr occ_map, const Eigen::Vector3i pool_size)
 {
-    POOL_SIZE_ = pool_size; // 地图尺寸
+    POOL_SIZE_ = pool_size;      // 地图尺寸
     CENTER_IDX_ = pool_size / 2; // 地图中心索引
 
     // 初始化地图
@@ -97,7 +97,7 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
 
     if (checkOccupancy(Index2Coord(start_idx)))
     {
-        //ROS_WARN("Start point is insdide an obstacle.");
+        // ROS_WARN("Start point is insdide an obstacle.");
         do
         {
             start_pt = (start_pt - end_pt).normalized() * step_size_ + start_pt;
@@ -108,7 +108,7 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
 
     if (checkOccupancy(Index2Coord(end_idx)))
     {
-        //ROS_WARN("End point is insdide an obstacle.");
+        // ROS_WARN("End point is insdide an obstacle.");
         do
         {
             end_pt = (end_pt - start_pt).normalized() * step_size_ + end_pt;
@@ -153,9 +153,9 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
     startPtr->rounds = rounds_;
     startPtr->gScore = 0;
     startPtr->fScore = getHeu(startPtr, endPtr);
-    startPtr->state = GridNode::OPENSET; //put start node in open set
-    startPtr->cameFrom = NULL; // 起点的父节点为空
-    openSet_.push(startPtr); //put start in open set
+    startPtr->state = GridNode::OPENSET; // put start node in open set
+    startPtr->cameFrom = NULL;           // 起点的父节点为空
+    openSet_.push(startPtr);             // put start in open set
 
     endPtr->index = end_idx;
 
@@ -180,7 +180,7 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
             gridPath_ = retrievePath(current);
             return true;
         }
-        current->state = GridNode::CLOSEDSET; //move current node from open set to closed set.
+        current->state = GridNode::CLOSEDSET; // move current node from open set to closed set.
 
         for (int dx = -1; dx <= 1; dx++)
             for (int dy = -1; dy <= 1; dy++)
@@ -207,7 +207,7 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
 
                     if (flag_explored && neighborPtr->state == GridNode::CLOSEDSET)
                     {
-                        continue; //in closed set.
+                        continue; // in closed set.
                     }
 
                     neighborPtr->rounds = rounds_;
@@ -222,15 +222,15 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
 
                     if (!flag_explored)
                     {
-                        //discover a new node
+                        // discover a new node
                         neighborPtr->state = GridNode::OPENSET;
                         neighborPtr->cameFrom = current;
                         neighborPtr->gScore = tentative_gScore;
                         neighborPtr->fScore = tentative_gScore + getHeu(neighborPtr, endPtr);
-                        openSet_.push(neighborPtr); //put neighbor in open set and record it.
+                        openSet_.push(neighborPtr); // put neighbor in open set and record it.
                     }
                     else if (tentative_gScore < neighborPtr->gScore)
-                    { //in open set and need update
+                    { // in open set and need update
                         neighborPtr->cameFrom = current;
                         neighborPtr->gScore = tentative_gScore;
                         neighborPtr->fScore = tentative_gScore + getHeu(neighborPtr, endPtr);

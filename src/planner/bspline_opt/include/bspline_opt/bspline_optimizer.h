@@ -146,12 +146,12 @@ namespace ego_planner
         double dist0_;             // safe distance
         double max_vel_, max_acc_; // dynamic limits
 
-        int variable_num_;              // optimization variables
-        int iter_num_;                  // iteration of the solver
+        int variable_num_; // optimization variables
+        int iter_num_;     // iteration of the solver
         // 记录历史最优变量，供旧版优化流程使用。
         Eigen::VectorXd best_variable_; //
         // 记录历史最小代价，供重启或早停时参考。
-        double min_cost_;               //
+        double min_cost_; //
 
         // 当前轨迹控制点及其避障辅助约束。
         ControlPoints cps_;

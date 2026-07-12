@@ -3,7 +3,6 @@
 
 namespace ego_planner
 {
-
     void EGOReplanFSM::init(ros::NodeHandle &nh)
     {
         current_wp_ = 0;
@@ -36,7 +35,7 @@ namespace ego_planner
         // ROS 定时器的默认行为是单线程串行回调：
         // 当前一次回调还没执行完，下一次触发时间即使到了，也会被延迟到当前执行完后再执行。
         // 它不会打断当前回调，也不会“叠加”多个线程来抢跑。
-        exec_timer_ = nh.createTimer(ros::Duration(0.01), &EGOReplanFSM::execFSMCallback, this); // 100hz
+        exec_timer_ = nh.createTimer(ros::Duration(0.01), &EGOReplanFSM::execFSMCallback, this);          // 100hz
         safety_timer_ = nh.createTimer(ros::Duration(0.05), &EGOReplanFSM::checkCollisionCallback, this); // 20hz
 
         odom_sub_ = nh.subscribe("/odom_world", 1, &EGOReplanFSM::odometryCallback, this);
@@ -193,7 +192,6 @@ namespace ego_planner
 
     void EGOReplanFSM::changeFSMExecState(FSM_EXEC_STATE new_state, string pos_call)
     {
-
         if (new_state == exec_state_)
             continously_called_times_++;
         else
@@ -213,7 +211,6 @@ namespace ego_planner
     void EGOReplanFSM::printFSMExecState()
     {
         static string state_str[7] = {"INIT", "WAIT_TARGET", "GEN_NEW_TRAJ", "REPLAN_TRAJ", "EXEC_TRAJ", "EMERGENCY_STOP"};
-
         cout << "[FSM]: state: " + state_str[int(exec_state_)] << endl;
     }
 
@@ -351,7 +348,6 @@ namespace ego_planner
 
         case EMERGENCY_STOP:
         {
-
             if (flag_escape_emergency_) // Avoiding repeated calls
             {
                 callEmergencyStop(odom_pos_);

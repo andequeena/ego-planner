@@ -4,7 +4,6 @@
 
 namespace ego_planner
 {
-
     // SECTION interfaces for setup and query
 
     EGOPlannerManager::EGOPlannerManager() {}
@@ -326,7 +325,7 @@ namespace ego_planner
 
         vector<vector<Eigen::Vector3d>> a_star_pathes;
         a_star_pathes = bspline_optimizer_rebound_->initControlPoints(ctrl_pts, true);
-        
+
         t_init = ros::Time::now() - t_start;
 
         static int vis_id = 0;
